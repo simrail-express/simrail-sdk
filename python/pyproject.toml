@@ -4,7 +4,7 @@ version = "0.1.0"
 description = "Unofficial Software Development Toolkit for SimRail - The Railway Simulator"
 authors = ["Piotr Kilczuk <piotr@kilczuk.dev>"]
 license = "MIT"
-readme = "README.md"
+readme = "../README.md"
 packages = [{include = "simrail_sdk", from = "./src"}]
 
 [tool.poetry.dependencies]
