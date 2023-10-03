@@ -1,0 +1,28 @@
+name: PYPI Upload
+
+on:
+  - workflow_dispatch
+
+jobs:
+  pypi_upload:
+    name: pypi-upload
+    runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
+    defaults:
+      run:
+        working-directory: ./python
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: "3.10"
+      - name: Build package
+        run: |
+          pip install poetry
+          poetry build
+      - name: Publish package
+        uses: pypa/gh-action-pypi-publish@release/v1
