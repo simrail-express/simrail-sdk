@@ -8,9 +8,10 @@ readme = "../README.md"
 packages = [{include = "simrail_sdk", from = "./src"}]
 
 [tool.poetry.dependencies]
-python = "^3.7"
+python = "^3.8"
 simpleregistry = "^0.2.0"
 pydantic = "^2.4.2"
+flask-babel = "^4.0.0"
 
 [tool.poetry.group.dev.dependencies]
 pytest = "^7.4.2"
