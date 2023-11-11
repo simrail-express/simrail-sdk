@@ -1,10 +1,11 @@
 from __future__ import annotations
 
+import dataclasses
 from typing import List, Optional
 
 import simpleregistry
 
-from simrail_sdk import stations, enums, base
+from simrail_sdk import stations, enums
 
 
 class LineSectionRegistry(simpleregistry.Registry):
@@ -15,7 +16,9 @@ class LineSectionRegistry(simpleregistry.Registry):
     #         return list(sections)[0]
     #     raise ValueError(f"No line {line} between {a.name} and {b.name}")
 
-    def get_after(self, line: int, a: stations.Station, direction: enums.Parity) -> Optional[LineSection]:
+    def get_after(
+        self, line: int, a: stations.Station, direction: enums.Parity
+    ) -> Optional[LineSection]:
         if (
             a.station_types == [enums.StationType.HALT]
             or a.station_types == [enums.StationType.FREIGHT_GROUP]
@@ -25,7 +28,9 @@ class LineSectionRegistry(simpleregistry.Registry):
 
         if a.station_types == [enums.StationType.BRANCH_OFF_POINT]:
             if a.belongs_to is None:
-                raise ValueError(f"A belongs_to station must be defined for BRANCH_OFF_POINT: {a.name}")
+                raise ValueError(
+                    f"A belongs_to station must be defined for BRANCH_OFF_POINT: {a.name}"
+                )
             a = a.belongs_to
 
         try:
@@ -41,18 +46,17 @@ line_section_registry = LineSectionRegistry("line_sections")
 
 
 @simpleregistry.register(line_section_registry)
-class LineSection(base.BasePydanticModel):
+@dataclasses.dataclass(frozen=True)
+class LineSection:
     line: int
     from_station: stations.Station
     to_station: stations.Station
-    intermediate_points: List[stations.Station] = []  # @TODO: This is bad in Python, but it's in the Pydantic docs
+    intermediate_points: List[stations.Station] = dataclasses.field(
+        default_factory=list
+    )
     interlock_type: Optional[enums.InterlockType] = enums.InterlockType.SS
     tracks: int = 2
     etcs_level: Optional[enums.ETCSLevel] = None
-
-    @property
-    def surrogate_pk(self):
-        return f"{self.line}:{self.from_station.name}:{self.to_station.name}"
 
     def __str__(self):
         return self.name()
@@ -63,9 +67,6 @@ class LineSection(base.BasePydanticModel):
         else:
             a, b = self.to_station.name, self.from_station.name
         return f"{a} - {b}"
-
-    class Config:
-        pk_fields = ["surrogate_pk"]
 
 
 LK1__WarszawaZachodniaR19__WarszawaZachodnia = LineSection(

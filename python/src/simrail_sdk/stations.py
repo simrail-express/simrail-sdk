@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import dataclasses
 import decimal
 import logging
 from typing import List, Dict, Optional, Set
@@ -16,17 +17,22 @@ DEFAULT_SHORT_NAME_REPLACEMENTS = {
 }
 
 
-station_registry = simpleregistry.Registry("stations", {simpleregistry.Index(["name"])})
+station_registry = simpleregistry.Registry(
+    "stations", indexes={simpleregistry.Index(["name"])}
+)
 
 
 @simpleregistry.register(station_registry)
-class Station(base.BasePydanticModel):
+@dataclasses.dataclass(frozen=True)
+class Station:
     name: str
     lat: decimal.Decimal
     lon: decimal.Decimal
     mileage: Dict[str, decimal.Decimal]
     radio_channels: List[enums.RadioChannel]
-    station_types: List[enums.StationType] = [enums.StationType.STATION]
+    station_types: List[enums.StationType] = dataclasses.field(
+        default_factory=lambda: [enums.StationType.STATION]
+    )
     is_boundary: bool = False
     remote_control_facilities: bool = False
     remotely_controlled_from: Optional[str] = None
@@ -38,15 +44,14 @@ class Station(base.BasePydanticModel):
     skippable: bool = False
     short_name: Optional[str] = None
 
-    class Config:
-        pk_fields = ["name"]
-
     @property
     def printable_name(self) -> str:
         if self.short_name:
             return self.short_name
         words = self.name.split()
-        words_with_replacements = [DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words]
+        words_with_replacements = [
+            DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words
+        ]
         return " ".join(words_with_replacements)
 
     @property
@@ -63,30 +68,38 @@ class Station(base.BasePydanticModel):
     @property
     def is_station(self) -> bool:
         return (
-            enums.StationType.STATION in self.station_types or enums.StationType.TECHNICAL_STATION in self.station_types
+            enums.StationType.STATION in self.station_types
+            or enums.StationType.TECHNICAL_STATION in self.station_types
         )
 
     @property
     def is_traffic_post(self) -> bool:
-        applicable_types = {enums.StationType.BLOCK_POST, enums.StationType.JUNCTION, enums.StationType.PASSING_LOOP}
-        return self.is_station or bool(applicable_types.intersection(self.station_types))
+        applicable_types = {
+            enums.StationType.BLOCK_POST,
+            enums.StationType.JUNCTION,
+            enums.StationType.PASSING_LOOP,
+        }
+        return self.is_station or bool(
+            applicable_types.intersection(self.station_types)
+        )
 
     @property
     def is_line_section_boundary(self):
         return (
-            self.is_traffic_post and self.station_types != [enums.StationType.BLOCK_POST]
+            self.is_traffic_post
+            and self.station_types != [enums.StationType.BLOCK_POST]
         ) or self.station_types == [enums.StationType.LINES_MERGING]
 
-    def should_issue_r307_for_train(self, train_number: int) -> Optional["Station"]:
-        if self not in R307_ISSUERS:
-            logging.info(f"{self.name} is not issuing R307.")
-            return None
-        for lower, upper, to_station in R307_ISSUERS[self]:
-            if lower <= train_number <= upper:
-                logger.info(f"{self.name} issuing R307 for train number {train_number} until {to_station.name}.")
-                return to_station
-        logger.info(f"{self.name} not issuing R307 for train number {train_number}.")
-        return None
+    # def should_issue_r307_for_train(self, train_number: int) -> Optional["Station"]:
+    #     if self not in R307_ISSUERS:
+    #         logging.info(f"{self.name} is not issuing R307.")
+    #         return None
+    #     for lower, upper, to_station in R307_ISSUERS[self]:
+    #         if lower <= train_number <= upper:
+    #             logger.info(f"{self.name} issuing R307 for train number {train_number} until {to_station.name}.")
+    #             return to_station
+    #     logger.info(f"{self.name} not issuing R307 for train number {train_number}.")
+    #     return None
 
 
 _LK001 = base.Bookmark()
@@ -1810,7 +1823,10 @@ CzestochowaStradom = Station(
     name="Częstochowa Stradom",
     lat=0,  # @TODO: placeholder
     lon=0,  # @TODO: placeholder
-    mileage={61: 117.223, 703: 2.7},  # @TODO: Bug in SimRail data? Stradom's not on line 703
+    mileage={
+        61: 117.223,
+        703: 2.7,
+    },  # @TODO: Bug in SimRail data? Stradom's not on line 703
     radio_channels=[],
 )
 CzestochowaGnaszyn = Station(
@@ -2334,7 +2350,11 @@ SosnowiecMaczki = Station(
     name="Sosnowiec Maczki",
     lat=0,  # @TODO: placeholder
     lon=0,  # @TODO: placeholder
-    mileage={133: 13.276, 163: 4.528, 668: 0},  # @TODO: This is a mistake in SimRail data, should be 667
+    mileage={
+        133: 13.276,
+        163: 4.528,
+        668: 0,
+    },  # @TODO: This is a mistake in SimRail data, should be 667
     radio_channels=[],
     is_boundary=True,
 )
@@ -3463,119 +3483,3 @@ Staszic = Station(
     radio_channels=[enums.RadioChannel.R3],
     station_types=[enums.StationType.JUNCTION],
 )
-
-
-R307_ISSUERS = {
-    Czestochowa: [
-        [40101, 40149, Katowice],
-        [40601, 40649, Katowice],
-    ],
-    CzestochowaStradom: [
-        [73101, 73199, JaworznoSzczakowa],
-        [6100, 6148, WarszawaWschodnia],
-        [61100, 61148, WarszawaWschodnia],
-    ],
-    CzestochowaTowarowa: [
-        [421000, 421098, Jedrzejow],
-        [441001, 441099, Tychy],
-        [442001, 442099, SosnowiecMaczki],
-        [447001, 447099, Tychy],
-    ],
-    DabrowaGorniczaTowarowa: [
-        [414000, 414098, Czestochowa],
-        [443901, 443999, CzestochowaMirow],
-    ],
-    Drzewica: [
-        [243331, 243399, Koniecpol],
-    ],
-    Gliwice: [
-        [644000, 644098, RudnikiKoloCzestochowy],
-    ],
-    JaworznoSzczakowa: [
-        [37100, 37198, CzestochowaStradom],
-        [44301, 44399, Katowice],
-        [412000, 412048, Kozlow],
-        [413000, 413098, Kielce],
-        [445000, 445098, CzestochowaTowarowa],
-    ],
-    Jedrzejow: [
-        [245021, 245099, CzestochowaTowarowa],
-    ],
-    Katowice: [
-        [4100, 4148, WarszawaWschodnia],
-        [40150, 40198, Czestochowa],
-        [40650, 40698, Czestochowa],
-        [41100, 41148, WarszawaWschodnia],
-        [42100, 42148, Kielce],
-        [42150, 42198, Kielce],
-        [42900, 42998, Kielce],
-        [43300, 43398, KrakowGlowny],
-        [45250, 45298, Koluszki],
-        [412050, 412098, Czestochowa],
-        [629000, 629048, Wloszczowa],
-        [649050, 649098, Myszkow],
-    ],
-    Kielce: [
-        [24101, 24149, Katowice],
-        [24151, 24199, Katowice],
-        [24901, 24999, Katowice],
-        [144251, 144299, Tychy],
-        [243501, 243599, Myslowice],
-    ],
-    Koluszki: [
-        [9100, 9148, WarszawaWschodnia],
-        [113050, 113098, WarszawaGlTowWoa],
-        [414000, 414098, WarszawaGlTowWoa],
-    ],
-    Koniecpol: [
-        [423400, 423498, DebaOpoczynska],
-    ],
-    Kozlow: [
-        [412000, 412048, Koluszki],
-    ],
-    KrakowGlowny: [
-        [3100, 3148, WarszawaWschodnia],
-        [31100, 31148, WarszawaWschodnia],
-    ],
-    KWKStaszic: [
-        [424000, 424098, Jedrzejow],
-        [444000, 444098, Czestochowa],
-        [464000, 464098, CzestochowaTowarowa],
-    ],
-    Ludynia: [
-        [244001, 244099, SosnowiecMaczki],
-    ],
-    Skierniewice: [
-        [91300, 91398, WarszawaWschodnia],
-        [91900, 91998, WarszawaWschodnia],
-    ],
-    WarszawaGdanska: [
-        [146001, 146049, Katowice],
-    ],
-    WarszawaGdanskaWg: [
-        [142001, 142099, Koluszki],
-    ],
-    WarszawaGlTowWoa: [
-        [132001, 132049, KrakowNowaHutaNhaGttr],
-        [145051, 145099, Koluszki],
-        [146051, 146099, Katowice],
-    ],
-    WarszawaWschodnia: [
-        [1301, 1349, KrakowGlowny],
-        [1401, 1449, Katowice],
-        [1601, 1649, CzestochowaStradom],
-        [1901, 1949, Koluszki],
-        [13101, 13149, KrakowGlowny],
-        [13251, 13299, KrakowGlowny],
-        [14101, 14149, Katowice],
-        [16101, 16149, CzestochowaStradom],
-        [19301, 19399, Skierniewice],
-        [19901, 19999, Skierniewice],
-    ],
-    Wloszczowa: [
-        [242201, 242249, ChorzowBatory],
-    ],
-    Zelislawice: [
-        [223000, 223048, Drzewica],
-    ],
-}
