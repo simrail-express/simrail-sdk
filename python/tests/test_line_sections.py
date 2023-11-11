@@ -5,7 +5,7 @@ r = line_sections.line_section_registry
 
 def test_get_after_halt():
     ls = r.get_after(1, stations.Brwinow, enums.Parity.ODD)
-    raise NotImplementedError(ls)
+    assert ls is None
 
 
 def test_get_after_freight_group():
@@ -33,4 +33,6 @@ def test_get_after_end_of_line():
 
 
 def test_name():
-    raise NotImplementedError
+    ls = line_sections.LK4__GrodziskMazowiecki__Korytow
+    assert ls.name == "LK4__GrodziskMazowiecki__Korytow"
+    assert str(ls) == "LK4__GrodziskMazowiecki__Korytow"

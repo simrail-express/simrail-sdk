@@ -44,6 +44,9 @@ class Station:
     skippable: bool = False
     short_name: Optional[str] = None
 
+    def __hash__(self) -> int:
+        return hash(self.name)
+
     @property
     def printable_name(self) -> str:
         if self.short_name:

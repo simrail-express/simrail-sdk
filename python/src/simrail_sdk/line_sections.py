@@ -58,6 +58,9 @@ class LineSection:
     tracks: int = 2
     etcs_level: Optional[enums.ETCSLevel] = None
 
+    def __hash__(self):
+        return hash((self.line, self.from_station, self.to_station))
+
     def __str__(self):
         return self.name()
 
