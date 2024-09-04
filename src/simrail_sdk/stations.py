@@ -24,7 +24,7 @@ class Station(base.BasePydanticModel):
     name: str
     lat: decimal.Decimal
     lon: decimal.Decimal
-    mileage: Dict[str, decimal.Decimal]
+    mileage: Dict[int, decimal.Decimal]
     radio_channels: List[enums.RadioChannel]
     station_types: List[enums.StationType] = [enums.StationType.STATION]
     is_boundary: bool = False
@@ -46,7 +46,9 @@ class Station(base.BasePydanticModel):
         if self.short_name:
             return self.short_name
         words = self.name.split()
-        words_with_replacements = [DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words]
+        words_with_replacements = [
+            DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words
+        ]
         return " ".join(words_with_replacements)
 
     @property
@@ -63,18 +65,26 @@ class Station(base.BasePydanticModel):
     @property
     def is_station(self) -> bool:
         return (
-            enums.StationType.STATION in self.station_types or enums.StationType.TECHNICAL_STATION in self.station_types
+            enums.StationType.STATION in self.station_types
+            or enums.StationType.TECHNICAL_STATION in self.station_types
         )
 
     @property
     def is_traffic_post(self) -> bool:
-        applicable_types = {enums.StationType.BLOCK_POST, enums.StationType.JUNCTION, enums.StationType.PASSING_LOOP}
-        return self.is_station or bool(applicable_types.intersection(self.station_types))
+        applicable_types = {
+            enums.StationType.BLOCK_POST,
+            enums.StationType.JUNCTION,
+            enums.StationType.PASSING_LOOP,
+        }
+        return self.is_station or bool(
+            applicable_types.intersection(self.station_types)
+        )
 
     @property
     def is_line_section_boundary(self):
         return (
-            self.is_traffic_post and self.station_types != [enums.StationType.BLOCK_POST]
+            self.is_traffic_post
+            and self.station_types != [enums.StationType.BLOCK_POST]
         ) or self.station_types == [enums.StationType.LINES_MERGING]
 
     def should_issue_r307_for_train(self, train_number: int) -> Optional["Station"]:
@@ -83,7 +93,9 @@ class Station(base.BasePydanticModel):
             return None
         for lower, upper, to_station in R307_ISSUERS[self]:
             if lower <= train_number <= upper:
-                logger.info(f"{self.name} issuing R307 for train number {train_number} until {to_station.name}.")
+                logger.info(
+                    f"{self.name} issuing R307 for train number {train_number} until {to_station.name}."
+                )
                 return to_station
         logger.info(f"{self.name} not issuing R307 for train number {train_number}.")
         return None
@@ -1810,7 +1822,10 @@ CzestochowaStradom = Station(
     name="Częstochowa Stradom",
     lat=0,  # @TODO: placeholder
     lon=0,  # @TODO: placeholder
-    mileage={61: 117.223, 703: 2.7},  # @TODO: Bug in SimRail data? Stradom's not on line 703
+    mileage={
+        61: 117.223,
+        703: 2.7,
+    },  # @TODO: Bug in SimRail data? Stradom's not on line 703
     radio_channels=[],
 )
 CzestochowaGnaszyn = Station(
@@ -2334,7 +2349,11 @@ SosnowiecMaczki = Station(
     name="Sosnowiec Maczki",
     lat=0,  # @TODO: placeholder
     lon=0,  # @TODO: placeholder
-    mileage={133: 13.276, 163: 4.528, 668: 0},  # @TODO: This is a mistake in SimRail data, should be 667
+    mileage={
+        133: 13.276,
+        163: 4.528,
+        668: 0,
+    },  # @TODO: This is a mistake in SimRail data, should be 667
     radio_channels=[],
     is_boundary=True,
 )
