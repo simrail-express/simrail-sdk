@@ -2,7 +2,6 @@ from __future__ import annotations
 
 import decimal
 import logging
-from typing import List, Dict, Optional, Set
 
 import simpleregistry
 
@@ -22,41 +21,111 @@ station_registry = simpleregistry.Registry("stations", {simpleregistry.Index(["n
 @simpleregistry.register(station_registry)
 class Station(base.BasePydanticModel):
     name: str
+    """
+    Full name of the station
+    """
+
     lat: decimal.Decimal
+    """
+    The latitude
+    """
+
     lon: decimal.Decimal
-    mileage: Dict[int, decimal.Decimal]
-    radio_channels: List[enums.RadioChannel]
-    station_types: List[enums.StationType] = [enums.StationType.STATION]
-    is_boundary: bool = False
+    """
+    The longitude
+    """
+
+    mileage: dict[int, decimal.Decimal]
+    """
+    Mileage for each line passing through expressed as a dictionary.
+    Line number (int) is the key, mileage (decimal.Decimal) is the value.
+    """
+
+    radio_channels: list[enums.RadioChannel]
+    """
+    A list of radio channels used at the station
+    """
+
+    station_types: list[enums.StationType] = [enums.StationType.STATION]
+    """
+    A list of station types. 
+    A station can have multiple types, 
+    for example be a junction and a halt at the same time.
+    """
+
     remote_control_facilities: bool = False
-    remotely_controlled_from: Optional[str] = None
+    """
+    If the station can control other stations remotely
+    """
+
+    remotely_controlled_from: str | None = None
+    """
+    If the station is remotely controlled, 
+    the abbreviation of the station controlling it
+    """
+
     remote_control_with_optional_local_control: bool = False
+    """
+    If the station is remotely controlled,
+    but can be controlled locally as well when needed,
+    the abbreviation of the station controlling it
+    """
+
     shp: bool = True
+    """
+    Whether there are SHP magazines at the station
+    """
+
     radio_recording: bool = True
-    r307: bool = False
-    belongs_to: Optional["Station"] = None
+    """
+    Whether there are radio comms recording devices at the station
+    """
+
+    belongs_to: Station | None = None
+    """
+    For branch off points, these will belong to a specific station
+    """
+
     skippable: bool = False
-    short_name: Optional[str] = None
+    """
+    If the station should not be presented separately in the working timetable
+    """
+
+    short_name: str | None = None
+    """
+    Shortened name, displayed in the documents to fit the layout constraints
+    """
 
     class Config:
         pk_fields = ["name"]
+        """
+        Used by the simpleregistry. No two stations can have the same name.
+        """
 
     @property
     def printable_name(self) -> str:
+        """
+        Returns a shortened name of the station if available.
+        To be used in printable documents to fit the layout constraints.
+        """
         if self.short_name:
             return self.short_name
         words = self.name.split()
-        words_with_replacements = [
-            DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words
-        ]
+        words_with_replacements = [DEFAULT_SHORT_NAME_REPLACEMENTS.get(w, w) for w in words]
         return " ".join(words_with_replacements)
 
     @property
-    def branch_off_points(self) -> Set[Station]:
+    def branch_off_points(self) -> set[Station]:
+        """
+        If the station has branch off points, return them.
+        """
         return station_registry.filter(belongs_to=self)
 
     @property
     def is_junction(self) -> bool:
+        """
+        If more than one line passes through the station, return True.
+        """
         lines = set(self.mileage.keys())
         for branch_off in self.branch_off_points:
             lines = lines.union(branch_off.mileage.keys())
@@ -64,41 +133,37 @@ class Station(base.BasePydanticModel):
 
     @property
     def is_station(self) -> bool:
+        """
+        If the station is a proper station, return True.
+        """
         return (
-            enums.StationType.STATION in self.station_types
-            or enums.StationType.TECHNICAL_STATION in self.station_types
+            enums.StationType.STATION in self.station_types or enums.StationType.TECHNICAL_STATION in self.station_types
         )
 
     @property
     def is_traffic_post(self) -> bool:
+        """
+        If the station is a traffic post, return True.
+
+        Halts etc. are not traffic posts.
+        """
         applicable_types = {
             enums.StationType.BLOCK_POST,
             enums.StationType.JUNCTION,
             enums.StationType.PASSING_LOOP,
         }
-        return self.is_station or bool(
-            applicable_types.intersection(self.station_types)
-        )
+        return self.is_station or bool(applicable_types.intersection(self.station_types))
 
     @property
     def is_line_section_boundary(self):
-        return (
-            self.is_traffic_post
-            and self.station_types != [enums.StationType.BLOCK_POST]
-        ) or self.station_types == [enums.StationType.LINES_MERGING]
+        """
+        If the station is a boundary between two line sections, return True.
 
-    def should_issue_r307_for_train(self, train_number: int) -> Optional["Station"]:
-        if self not in R307_ISSUERS:
-            logging.info(f"{self.name} is not issuing R307.")
-            return None
-        for lower, upper, to_station in R307_ISSUERS[self]:
-            if lower <= train_number <= upper:
-                logger.info(
-                    f"{self.name} issuing R307 for train number {train_number} until {to_station.name}."
-                )
-                return to_station
-        logger.info(f"{self.name} not issuing R307 for train number {train_number}.")
-        return None
+        Block posts are not line section boundaries.
+        """
+        return (
+            self.is_traffic_post and self.station_types != [enums.StationType.BLOCK_POST]
+        ) or self.station_types == [enums.StationType.LINES_MERGING]
 
 
 _LK001 = base.Bookmark()
@@ -108,7 +173,6 @@ Katowice = Station(
     lon=19.0163,
     mileage={1: 318.378, 137: 0.700, 138: 32.970, 139: 0},
     radio_channels=[enums.RadioChannel.R2],
-    r307=True,
 )
 KatowiceZawodzie = Station(
     name="Katowice Zawodzie",
@@ -298,7 +362,6 @@ Myszkow = Station(
     lon=0,  # @TODO: placeholder
     mileage={1: 261.016},
     radio_channels=[],
-    is_boundary=True,
 )
 MyszkowNowaWies = Station(
     name="Myszków Nowa Wieś",
@@ -366,7 +429,6 @@ CzestochowaTowarowa = Station(
     lon=0,  # @TODO: placeholder
     mileage={1: 232.02},
     radio_channels=[],
-    r307=True,
 )
 Czestochowa = Station(
     name="Częstochowa",
@@ -374,7 +436,6 @@ Czestochowa = Station(
     lon=0,  # @TODO: placeholder
     mileage={1: 229.745},
     radio_channels=[],
-    r307=True,
 )
 CzestochowaAniolow = Station(
     name="Częstochowa Aniołów",
@@ -691,7 +752,6 @@ Skierniewice = Station(
     lon=0,  # @TODO: placeholder
     mileage={1: 65.926},
     radio_channels=[enums.RadioChannel.R2],
-    r307=True,
 )
 SkierniewiceGt201_208 = Station(
     name="Skierniewice GT 201-208",
@@ -747,7 +807,6 @@ Zyrardow = Station(
     lon=18.8622,  # @TODO: placeholder
     mileage={1: 43.141, 529: -18.314},  # @TODO: Issue with SimRail data
     radio_channels=[enums.RadioChannel.R2],
-    is_boundary=True,
 )
 Jaktorow = Station(
     name="Jaktorów",
@@ -832,7 +891,6 @@ WarszawaWschodnia = Station(
     lat=52.2515628,
     lon=21.052267,
     mileage={2: 4.254, 9: 4.254, 45: 0},
-    r307=True,
     radio_channels=[enums.RadioChannel.R2],
 )
 WarszawaWschodniaR34 = Station(
@@ -982,7 +1040,6 @@ KrakowGlowny = Station(
     lon=19.9479103,
     mileage={8: 319.440},
     radio_channels=[enums.RadioChannel.R1],
-    r307=True,
 )
 KrakowPrzedmiescie = Station(
     name="Kraków Przedmieście",
@@ -1090,7 +1147,6 @@ Miechow = Station(
     lat=50.353,
     lon=20.0104,
     mileage={8: 277.343},
-    is_boundary=True,
     radio_channels=[enums.RadioChannel.R1],
 )
 Kozlow = Station(
@@ -1130,7 +1186,6 @@ SedziszowTowarowy = Station(
     lon=20.0549,
     mileage={8: 250.520},
     radio_channels=[enums.RadioChannel.R4],
-    is_boundary=True,
 )
 Potok = Station(
     name="Potok",
@@ -1214,7 +1269,6 @@ Kielce = Station(
     lon=0,  # @TODO: placeholder
     mileage={8: 187.672, 61: 0},
     radio_channels=[enums.RadioChannel.R4],
-    r307=True,
 )
 PiaskiKoloKielc = Station(
     name="Piaski koło Kielc",
@@ -1285,7 +1339,6 @@ SkarzyskoKamienna = Station(
     lon=0,  # @TODO: placeholder
     mileage={8: 143.442},
     radio_channels=[enums.RadioChannel.R4],
-    r307=True,
 )
 
 _LK009 = base.Bookmark()
@@ -1295,7 +1348,6 @@ WarszawaPraga = Station(
     lon=0,  # @TODO: placeholder
     mileage={9: 10.100},
     radio_channels=[],
-    is_boundary=True,
 )
 
 _LK014 = base.Bookmark()
@@ -1527,7 +1579,6 @@ WarszawaGlTowSr18 = Station(
     lon=0,  # @TODO: placeholder
     mileage={19: 1.094},
     radio_channels=[],
-    is_boundary=True,
 )
 
 _LK020 = base.Bookmark()
@@ -1546,7 +1597,6 @@ WarszawaGlTowWoa = Station(
     mileage={20: 0.0},
     radio_channels=[enums.RadioChannel.R2],
     station_types=[enums.StationType.TECHNICAL_STATION],
-    r307=True,
 )
 WarszawaCzyste = Station(
     name="Warszawa Czyste",
@@ -1592,7 +1642,6 @@ Radzice = Station(
     lon=20.397191047668,
     mileage={22: 28.43, 573: 5.099},
     radio_channels=[enums.RadioChannel.R1],
-    is_boundary=True,
 )
 RadzicePzsR31 = Station(
     name="Radzice PZS R31",
@@ -1600,7 +1649,6 @@ RadzicePzsR31 = Station(
     lon=0,  # @TODO: placeholder
     mileage={22: 25.680, 574: -0.025},
     radio_channels=[],
-    is_boundary=True,
     station_types=[enums.StationType.LINES_MERGING],
     belongs_to=Radzice,
 )
@@ -1620,7 +1668,6 @@ Drzewica = Station(
     lon=0,  # @TODO: placeholder
     mileage={22: 35.993},
     radio_channels=[enums.RadioChannel.R1],
-    r307=True,
 )
 
 _LK025 = base.Bookmark()
@@ -1738,7 +1785,6 @@ Czarnca = Station(
     lat=50.8238578,
     lon=19.9446487,
     mileage={61: 53.035, 571: 0},
-    is_boundary=True,
     radio_channels=[enums.RadioChannel.R1],
     station_types=[enums.StationType.HALT, enums.StationType.JUNCTION],
 )
@@ -1759,8 +1805,6 @@ Zelislawice = Station(
     lon=19.858560562134,
     mileage={61: 59.716, 572: 8.409},
     radio_channels=[enums.RadioChannel.R1],
-    is_boundary=True,
-    r307=True,
 )
 Koniecpol = Station(
     name="Koniecpol",
@@ -2142,7 +2186,6 @@ Dlubnia = Station(
     lon=0,  # @TODO: placeholder
     mileage={95: 13.15},
     radio_channels=[],
-    is_boundary=True,
 )
 KrakowNowaHutaNha = Station(
     name="Kraków Nowa Huta Nha",
@@ -2355,7 +2398,6 @@ SosnowiecMaczki = Station(
         668: 0,
     },  # @TODO: This is a mistake in SimRail data, should be 667
     radio_channels=[],
-    is_boundary=True,
 )
 Pieczyska = Station(
     name="Pieczyska",
@@ -2450,7 +2492,6 @@ KatowiceTowarowaKTC = Station(
         651: 2.185,  # Bug in Simrail data, real line 713
     },
     radio_channels=[enums.RadioChannel.R5],
-    is_boundary=True,
 )
 KatowiceZaleze = Station(
     name="Katowice Załęże",
@@ -2554,7 +2595,6 @@ Szabelnia = Station(
     lon=0,  # @TODO: placeholder
     mileage={138: 26.255},
     radio_channels=[],
-    is_boundary=True,
     station_types=[enums.StationType.JUNCTION],
 )
 
@@ -2566,7 +2606,6 @@ Brynow = Station(
     mileage={139: 3.193},
     radio_channels=[enums.RadioChannel.R3],
     station_types=[enums.StationType.JUNCTION],
-    is_boundary=True,
 )
 KatowiceBrynow = Station(
     name="Katowice Brynów",
@@ -2670,7 +2709,6 @@ KatowiceKostuchna = Station(
     lon=0,  # @TODO: placeholder
     mileage={142: 8.344},
     radio_channels=[],
-    is_boundary=True,
 )
 
 _LK143 = base.Bookmark()
@@ -2840,7 +2878,6 @@ DabrowaGorniczaTowarowa = Station(
     lon=0,  # @TODO: placeholder
     mileage={154: 20.297, 171: 0},
     radio_channels=[],
-    is_boundary=True,
 )
 
 _LK155 = base.Bookmark()
@@ -3011,7 +3048,6 @@ Tychy = Station(
     lon=0,  # @TODO: placeholder
     mileage={142: 15.172, 179: 16.97},
     radio_channels=[],
-    r307=True,
 )
 TychyZachodnie = Station(
     name="Tychy Zachodnie",
@@ -3437,7 +3473,6 @@ Durzyn = Station(
     mileage={14: 162.443, 815: 162.443},
     radio_channels=[enums.RadioChannel.R5],
     station_types=[enums.StationType.TECHNICAL_STATION],
-    r307=True,
 )
 
 _LK839 = base.Bookmark()
@@ -3448,7 +3483,6 @@ WarszawaGrochow = Station(
     mileage={45: 7.500, 839: 3.333},
     radio_channels=[enums.RadioChannel.R2],
     station_types=[enums.StationType.TECHNICAL_STATION],
-    is_boundary=True,
 )
 WarszawaGrochowR5 = Station(
     name="Warszawa Grochów R5",
@@ -3471,8 +3505,6 @@ KWKStaszic = Station(
     mileage={898: 3.700},
     radio_channels=[enums.RadioChannel.R3],
     station_types=[enums.StationType.TECHNICAL_STATION],
-    is_boundary=True,
-    r307=True,
 )
 Staszic = Station(
     name="Staszic",
