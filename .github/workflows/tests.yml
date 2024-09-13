@@ -8,9 +8,6 @@ jobs:
   test:
     name: tests
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: ./python
     strategy:
       matrix:
         python-version: ["3.8", "3.9", "3.10", "3.11"]
