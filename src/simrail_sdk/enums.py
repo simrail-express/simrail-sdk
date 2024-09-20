@@ -23,3 +23,8 @@ class StationType(enum.Enum):
     PASSING_LOOP = "m"
     STATION = "st"
     TECHNICAL_STATION = "stth"
+
+
+class StopType(enum.Enum):
+    PH = "ph"
+    PT = "pt"
